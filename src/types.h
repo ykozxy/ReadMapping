@@ -11,8 +11,8 @@
 
 #define SUBSTR_MIN_LENGTH 15  // Substrings less than this length will not be considered
 #define SUBSTR_COMBINE_LENGTH 8  // Substrings less than this length will be combined
-#define SUBSTR_THRESHOLD 40  // Substrings less than this length will only be split two-fold
-#define SUBSTR_DIVISIONS {3, 4, 5, 6}  // The number of divisions to make when splitting the read
+#define SUBSTR_THRESHOLD 30  // Substrings less than this length will only be split two-fold
+#define SUBSTR_DIVISIONS {3, 4, 5, 6, 7, 8}  // The number of divisions to make when splitting the read
 #define MAX_GAP 25  // Maximum indices to search backward/forward in local search per position
 #define LOCAL_MATCH_SCORE_TOLERANCE 4  // Paths with difference with top score less than this will be considered in backtrace in local match
 #define GLOBAL_MATCH_MAX_LENGTH 100000  // Maximum length of a global match
@@ -312,10 +312,12 @@ struct Mapping {
 /* Represents a read sequence */
 struct ReadSequence {
     std::string read; // The read sequence
+    std::string label; // The label of the read sequence
     Mapping *mapping; // The mapping of the read sequence to a genome
 
-    explicit ReadSequence(std::string read) {
+    explicit ReadSequence(std::string read, std::string label) {
         this->read = std::move(read);
+        this->label = std::move(label);
         this->mapping = nullptr;
     }
 

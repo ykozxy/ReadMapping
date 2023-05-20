@@ -52,6 +52,12 @@ public:
     void output_mutations(const std::string &output_file);
 
     /**
+     * Output the mapping of all reads
+     * @param output_file - The path to the output file
+     */
+    void output_mappings(const std::string &output_file);
+
+    /**
      * Returns the reference DNA
      * @return The reference DNA
      */
@@ -62,6 +68,8 @@ public:
      * @return The reads
      */
     [[nodiscard]] const std::vector<ReadPair *> &get_reads() const;
+
+    bool map_mode = false;
 
 private:
     /* ==================== Private variables ==================== */

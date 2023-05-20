@@ -29,10 +29,6 @@ ReadMapping::~ReadMapping() {
 void ReadMapping::do_mapping() {
     logger->create_progress_bar((int) reads.size());
 
-//    map_worker(0, (int) reads.size());
-//    logger->finish_progress_bar();
-//    return;
-
     vector<future<void>> futures;
 
     // Calculate number reads per worker
@@ -90,6 +86,16 @@ void ReadMapping::map_worker(int start, int end) {
 }
 
 void ReadMapping::map_pair(ReadPair *read_pair) {
+    if (map_mode) {
+        vector<Mapping *> mappings_left;
+        map_read(read_pair->left, mappings_left);
+        read_pair->left->mapping = mappings_left[0];
+        vector<Mapping *> mappings_right;
+        map_read(read_pair->right, mappings_right);
+        read_pair->right->mapping = mappings_right[0];
+        return;
+    }
+
     vector<Mapping *> mappings_left;
     for (int i = 0; i <= READMAP_PADDING_THRESHOLD; i++) {
         map_read(read_pair->left, mappings_left, i);
@@ -157,6 +163,14 @@ void ReadMapping::map_pair(ReadPair *read_pair) {
 }
 
 void ReadMapping::map_read(ReadSequence *read, std::vector<Mapping *> &mappings, int padding) const {
+    if (map_mode) {
+        auto m = global_match(read);
+        if (m != nullptr) {
+            mappings.emplace_back(m);
+        }
+        return;
+    }
+
     /* If read is too short, abort */
     if (read->read.length() <= SUBSTR_MIN_LENGTH) {
         return;
@@ -321,13 +335,13 @@ void ReadMapping::map_read(ReadSequence *read, std::vector<Mapping *> &mappings,
         }
     }
 
-    if (mappings.empty()) {
-        // Use global match
-        // FIXME: this is extremely slow
-//        auto m = global_match(read);
-//        if (m != nullptr && m->num_errors() < 8) {
-//            mappings.emplace_back(m);
-//        }
+    if (mappings.empty() && map_mode) {
+//         Use global match
+//         FIXME: this is extremely slow
+        auto m = global_match(read);
+        if (m != nullptr && m->num_errors() < 8) {
+            mappings.emplace_back(m);
+        }
     }
 }
 
@@ -740,6 +754,33 @@ void ReadMapping::output_mutations(const string &output_file) {
     out.close();
 }
 
+void ReadMapping::output_mappings(const std::string &output_file) {
+    // Sort the reads by their mapping positions
+    vector<ReadSequence *> sorted_reads;
+    for (auto *read: reads) {
+        sorted_reads.push_back(read->left);
+        sorted_reads.push_back(read->right);
+    }
+    sort(sorted_reads.begin(), sorted_reads.end(), [](ReadSequence *a, ReadSequence *b) {
+        if (a->mapping == nullptr) {
+            return false;
+        } else if (b->mapping == nullptr) {
+            return true;
+        }
+        return a->mapping->position < b->mapping->position;
+    });
+
+    ofstream out(output_file);
+    if (!out.is_open()) {
+        logger->log_msg(LogLevel::ERROR, "output_mappings", "Could not open output file " + output_file);
+        return;
+    }
+
+    for (auto *read: sorted_reads) {
+        out << read->label << endl;
+    }
+}
+
 const string &ReadMapping::get_reference_dna() const {
     return reference_dna;
 }
@@ -791,9 +832,9 @@ void ReadMapping::read_reads(const string &input_file) {
             getline(input_file_stream, line);
 
             if (last == nullptr) {
-                last = new ReadSequence(line);
+                last = new ReadSequence(line, name);
             } else {
-                auto *new_read = new ReadSequence(line);
+                auto *new_read = new ReadSequence(line, name);
                 auto *read_pair = new ReadPair(last, new_read);
                 reads.push_back(read_pair);
                 last = nullptr;
